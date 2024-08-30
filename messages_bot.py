@@ -4,11 +4,9 @@ import logging
 from datetime import datetime
 from config import messages_collection
 
-# Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Environment variables
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_ID')
 
 def save_to_db(data):
@@ -86,7 +84,6 @@ def main():
     updater = Updater(token=BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
-    # Handler for ALL messages
     all_message_handler_obj = MessageHandler(Filters.all, all_message_handler)
     dispatcher.add_handler(all_message_handler_obj)
 
