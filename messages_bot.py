@@ -44,9 +44,12 @@ def process_message(update):
         "edit_date": message.edit_date.isoformat() if message.edit_date else None,
         "media_group_id": message.media_group_id,
         "author_signature": message.author_signature,
-        "has_protected_content": message.has_protected_content,
-        "has_media_spoiler": message.has_media_spoiler
     }
+
+    # Safely add attributes that might not exist in all versions
+    for attr in ['has_protected_content', 'has_media_spoiler']:
+        if hasattr(message, attr):
+            data[attr] = getattr(message, attr)
 
     if message.photo:
         data["message_type"] = "photo"
