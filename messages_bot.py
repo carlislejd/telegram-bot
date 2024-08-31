@@ -9,6 +9,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_ID')
+CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 def save_to_db(data):
     collection = messages_collection()
