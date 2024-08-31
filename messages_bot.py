@@ -1,8 +1,9 @@
 import os
 from telegram.ext import Updater, MessageHandler, Filters
+from telegram.error import TelegramError
 import logging
 from datetime import datetime
-from config import messages_collection
+from config import messages_collection, users_collection
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -97,12 +98,61 @@ def all_message_handler(update, context):
     except Exception as e:
         logger.error(f"Unexpected error in message handling: {e}")
 
+def get_chat_members(context):
+    members = []
+    offset = 0
+    limit = 200  # You can adjust this, max is 200
+    while True:
+        try:
+            new_members = context.bot.get_chat_members(CHAT_ID, offset=offset, limit=limit)
+            if not new_members:
+                break
+            members.extend(new_members)
+            offset += len(new_members)
+        except TelegramError as e:
+            logger.error(f"Error fetching chat members: {e}")
+            break
+    return members
+
+def update_chat_members(context):
+    members = get_chat_members(context)
+    collection = users_collection()
+    
+    current_time = datetime.now()
+    
+    for member in members:
+        user_data = {
+            "user_id": member.user.id,
+            "username": member.user.username,
+            "first_name": member.user.first_name,
+            "last_name": member.user.last_name,
+            "is_bot": member.user.is_bot,
+            "status": member.status,
+            "last_updated": current_time
+        }
+        
+        collection.update_one(
+            {"user_id": member.user.id},
+            {"$set": user_data},
+            upsert=True
+        )
+    
+    logger.info(f"Updated information for {len(members)} members at {current_time}")
+
+def schedule_user_update(context):
+    job = context.job
+    update_chat_members(context)
+
 def main():
     updater = Updater(token=BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
-    all_message_handler_obj = MessageHandler(Filters.all, all_message_handler)
+    all_message_handler_obj = MessageHandler(Filters.all & ~Filters.command, all_message_handler)
     dispatcher.add_handler(all_message_handler_obj)
+
+    job_queue = updater.job_queue
+    
+    job_queue.run_repeating(schedule_user_update, interval=300, first=0)
 
     updater.start_polling()
     updater.idle()

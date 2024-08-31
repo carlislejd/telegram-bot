@@ -12,4 +12,7 @@ def messages_collection():
     return db.messages
 
 
-
+def users_collection():
+    client = pymongo.MongoClient(getenv('MONGO'))
+    db = client.telegram
+    return db.users
