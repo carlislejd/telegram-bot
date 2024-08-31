@@ -46,7 +46,6 @@ def process_message(update):
         "author_signature": message.author_signature,
     }
 
-    # Safely add attributes that might not exist in all versions
     for attr in ['has_protected_content', 'has_media_spoiler']:
         if hasattr(message, attr):
             data[attr] = getattr(message, attr)
