@@ -73,14 +73,29 @@ def process_message(update):
 
     elif message.sticker:
         data["message_type"] = "sticker"
-        data["sticker"] = {"file_id": message.sticker.file_id, "width": message.sticker.width, "height": message.sticker.height, "is_animated": message.sticker.is_animated, "is_video": message.sticker.is_video, "emoji": message.sticker.emoji, "set_name": message.sticker.set_name, "file_size": message.sticker.file_size}
-
+        sticker_data = {
+            "file_id": message.sticker.file_id,
+            "width": message.sticker.width,
+            "height": message.sticker.height,
+            "is_animated": message.sticker.is_animated,
+            "emoji": message.sticker.emoji,
+            "set_name": message.sticker.set_name,
+            "file_size": message.sticker.file_size
+        }
+        if hasattr(message.sticker, 'is_video'):
+            sticker_data["is_video"] = message.sticker.is_video
+        data["sticker"] = sticker_data
     return data
 
 def all_message_handler(update, context):
-    data = process_message(update)
-    logger.info(f"Received {data['message_type']} in group {data['chat']['id']} from {'bot' if data['user']['is_bot'] else 'user'} {data['user']['id']}")
-    save_to_db(data)
+    try:
+        data = process_message(update)
+        logger.info(f"Received {data['message_type']} in group {data['chat']['id']} from {'bot' if data['user']['is_bot'] else 'user'} {data['user']['id']}")
+        save_to_db(data)
+    except AttributeError as e:
+        logger.error(f"AttributeError in message processing: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error in message handling: {e}")
 
 def main():
     updater = Updater(token=BOT_TOKEN, use_context=True)
