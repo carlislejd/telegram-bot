@@ -7,7 +7,7 @@ load_dotenv()
 
 
 def messages_collection():
-    client = pymongo.MongoClient(getenv('MONGO'), ssl=True, ssl_cert_reqs='CERT_NONE')
+    client = pymongo.MongoClient(getenv('MONGO'))
     db = client.telegram
     return db.messages
 
