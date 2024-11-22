@@ -1,19 +1,13 @@
 import os
-import requests
-from telegram.ext import Updater, MessageHandler, Filters
-from telegram.error import TelegramError
 import logging
-from datetime import datetime
-from config import messages_collection, users_collection
+from telegram.ext import Updater, MessageHandler, Filters
+from bot_commands import add_command_handlers
+from config import messages_collection
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_ID')
-CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
-API_KEY = os.getenv('ANKR')
-ANKR_MULTICHAIN = f'https://rpc.ankr.com/multichain/{API_KEY}'
-HEADERS = {'Content-Type': 'application/json'}
+BOT_TOKEN = os.getenv("TELEGRAM_BOT_ID")
 
 def save_to_db(data):
     collection = messages_collection()
@@ -25,7 +19,7 @@ def process_message(update):
     chat = message.chat
 
     data = {
-        "timestamp": datetime.now(),
+        "timestamp": message.date,
         "message_id": message.message_id,
         "user": {
             "id": user.id,
@@ -33,88 +27,37 @@ def process_message(update):
             "first_name": user.first_name,
             "last_name": user.last_name,
             "is_bot": user.is_bot,
-            "language_code": user.language_code
+            "language_code": user.language_code,
         },
-        "chat": {
-            "id": chat.id,
-            "type": chat.type,
-            "title": chat.title
-        },
-        "message_type": "text",
+        "chat": {"id": chat.id, "type": chat.type, "title": chat.title},
         "text": message.text,
-        "entities": [{"type": entity.type, "offset": entity.offset, "length": entity.length} for entity in message.entities] if message.entities else [],
-        "reply_to_message_id": message.reply_to_message.message_id if message.reply_to_message else None,
-        "forward_from": message.forward_from.id if message.forward_from else None,
-        "forward_from_chat": message.forward_from_chat.id if message.forward_from_chat else None,
-        "forward_date": message.forward_date.isoformat() if message.forward_date else None,
-        "edit_date": message.edit_date.isoformat() if message.edit_date else None,
-        "media_group_id": message.media_group_id,
-        "author_signature": message.author_signature,
     }
-
-    for attr in ['has_protected_content', 'has_media_spoiler']:
-        if hasattr(message, attr):
-            data[attr] = getattr(message, attr)
-
-    if message.photo:
-        data["message_type"] = "photo"
-        data["photo"] = [{"file_id": photo.file_id, "file_unique_id": photo.file_unique_id, "width": photo.width, "height": photo.height, "file_size": photo.file_size} for photo in message.photo]
-        data["caption"] = message.caption
-
-    elif message.document:
-        data["message_type"] = "document"
-        data["document"] = {"file_id": message.document.file_id, "file_name": message.document.file_name, "mime_type": message.document.mime_type, "file_size": message.document.file_size}
-
-    elif message.video:
-        data["message_type"] = "video"
-        data["video"] = {"file_id": message.video.file_id, "width": message.video.width, "height": message.video.height, "duration": message.video.duration, "file_name": message.video.file_name, "mime_type": message.video.mime_type, "file_size": message.video.file_size}
-
-    elif message.audio:
-        data["message_type"] = "audio"
-        data["audio"] = {"file_id": message.audio.file_id, "duration": message.audio.duration, "performer": message.audio.performer, "title": message.audio.title, "file_name": message.audio.file_name, "mime_type": message.audio.mime_type, "file_size": message.audio.file_size}
-
-    elif message.voice:
-        data["message_type"] = "voice"
-        data["voice"] = {"file_id": message.voice.file_id, "duration": message.voice.duration, "mime_type": message.voice.mime_type, "file_size": message.voice.file_size}
-
-    elif message.sticker:
-        data["message_type"] = "sticker"
-        sticker_data = {
-            "file_id": message.sticker.file_id,
-            "width": message.sticker.width,
-            "height": message.sticker.height,
-            "is_animated": message.sticker.is_animated,
-            "emoji": message.sticker.emoji,
-            "set_name": message.sticker.set_name,
-            "file_size": message.sticker.file_size
-        }
-        if hasattr(message.sticker, 'is_video'):
-            sticker_data["is_video"] = message.sticker.is_video
-        data["sticker"] = sticker_data
     return data
 
-
-
-
 def all_message_handler(update, context):
+    """Handle all incoming messages."""
     try:
         data = process_message(update)
-        logger.info(f"Received {data['message_type']} in group {data['chat']['id']} from {'bot' if data['user']['is_bot'] else 'user'} {data['user']['id']}")
+        logger.info(f"Received message from {data['user']['id']}")
         save_to_db(data)
-    except AttributeError as e:
-        logger.error(f"AttributeError in message processing: {e}")
     except Exception as e:
-        logger.error(f"Unexpected error in message handling: {e}")
-
-
+        logger.error(f"Error in message handler: {e}")
 
 def main():
+    """Main entry point for the bot."""
     updater = Updater(token=BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
+
+    # Add command handlers from bot_commands.py
+    add_command_handlers(dispatcher)
+
+    # Add a message handler for all text messages
     dispatcher.add_handler(MessageHandler(Filters.all, all_message_handler))
 
+    # Start the bot
     updater.start_polling()
+    logger.info("Bot started and polling for updates.")
     updater.idle()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
