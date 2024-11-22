@@ -1,5 +1,5 @@
 import os
-from telegram.ext import Updater, MessageHandler, Filters
+from telegram.ext import Updater, MessageHandler, CommandHandler, Filters
 from telegram.error import TelegramError
 import logging
 from datetime import datetime
@@ -89,6 +89,18 @@ def process_message(update):
         data["sticker"] = sticker_data
     return data
 
+
+def wallet_handler(update, context):
+    if len(context.args) != 1:
+        update.message.reply_text("Usage: /wallet <wallet_address>")
+        return
+    
+    wallet_address = context.args[0]
+    logger.info(f"Received wallet command with address: {wallet_address}")
+    
+    update.message.reply_text("Nice!")
+
+
 def all_message_handler(update, context):
     try:
         data = process_message(update)
@@ -105,8 +117,9 @@ def main():
     updater = Updater(token=BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
-    all_message_handler_obj = MessageHandler(Filters.all, all_message_handler)
-    dispatcher.add_handler(all_message_handler_obj)
+    dispatcher.add_handler(CommandHandler('wallet', wallet_handler))
+
+    dispatcher.add_handler(MessageHandler(Filters.all, all_message_handler))
 
     updater.start_polling()
     updater.idle()
