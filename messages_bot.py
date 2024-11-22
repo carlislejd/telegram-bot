@@ -1,4 +1,5 @@
 import os
+import requests
 from telegram.ext import Updater, MessageHandler, CommandHandler, Filters
 from telegram.error import TelegramError
 import logging
@@ -10,6 +11,9 @@ logger = logging.getLogger(__name__)
 
 BOT_TOKEN = os.getenv('TELEGRAM_BOT_ID')
 CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+API_KEY = os.getenv('ANKR')
+ANKR_MULTICHAIN = f'https://rpc.ankr.com/multichain/{API_KEY}'
+HEADERS = {'Content-Type': 'application/json'}
 
 def save_to_db(data):
     collection = messages_collection()
@@ -96,9 +100,45 @@ def wallet_handler(update, context):
         return
     
     wallet_address = context.args[0]
-    logger.info(f"Received wallet command with address: {wallet_address}")
+    logger.info(f"Fetching NFT data for wallet: {wallet_address}")
     
-    update.message.reply_text("Nice!")
+    params = {
+        "id": 1,
+        "jsonrpc": "2.0",
+        "method": "ankr_getNFTsByOwner",
+        "params": {
+            "blockchain": ["eth", "base", "arbitrum"], 
+            "walletAddress": wallet_address,
+            "pageSize": 10,
+            "pageToken": "",
+            "filter": []
+        }
+    }
+
+    try:
+        response = requests.post(ANKR_MULTICHAIN, headers=HEADERS, json=params)
+        data = response.json()
+
+        if "result" in data and "assets" in data["result"]:
+            assets = data["result"]["assets"]
+            if assets:
+                nft_details = [
+                    f"- {nft['name']} (Blockchain: {nft['blockchain']}, Token ID: {nft['tokenId']})"
+                    for nft in assets
+                ]
+                nft_summary = "\n".join(nft_details[:5])
+                update.message.reply_text(
+                    f"Wallet {wallet_address} owns the following NFTs:\n{nft_summary}\n\nShowing up to 5 of {len(assets)} NFTs."
+                )
+            else:
+                update.message.reply_text(f"No NFTs found for wallet {wallet_address}.")
+        else:
+            update.message.reply_text(f"Could not retrieve NFT data for wallet {wallet_address}. Please try again later.")
+
+    except Exception as e:
+        logger.error(f"Error fetching NFT data: {e}")
+        update.message.reply_text("An error occurred while fetching the NFT data. Please try again later.")
+
 
 
 def all_message_handler(update, context):
