@@ -1,6 +1,6 @@
 import os
 import requests
-from telegram.ext import Updater, MessageHandler, CommandHandler, Filters
+from telegram.ext import Updater, MessageHandler, Filters
 from telegram.error import TelegramError
 import logging
 from datetime import datetime
@@ -94,51 +94,6 @@ def process_message(update):
     return data
 
 
-def wallet_handler(update, context):
-    if len(context.args) != 1:
-        update.message.reply_text("Usage: /wallet <wallet_address>")
-        return
-    
-    wallet_address = context.args[0]
-    logger.info(f"Fetching NFT data for wallet: {wallet_address}")
-    
-    params = {
-        "id": 1,
-        "jsonrpc": "2.0",
-        "method": "ankr_getNFTsByOwner",
-        "params": {
-            "blockchain": ["eth", "base", "arbitrum"], 
-            "walletAddress": wallet_address,
-            "pageSize": 10,
-            "pageToken": "",
-            "filter": []
-        }
-    }
-
-    try:
-        response = requests.post(ANKR_MULTICHAIN, headers=HEADERS, json=params)
-        data = response.json()
-
-        if "result" in data and "assets" in data["result"]:
-            assets = data["result"]["assets"]
-            if assets:
-                nft_details = [
-                    f"- {nft['name']} (Blockchain: {nft['blockchain']}, Token ID: {nft['tokenId']})"
-                    for nft in assets
-                ]
-                nft_summary = "\n".join(nft_details[:5])
-                update.message.reply_text(
-                    f"Wallet {wallet_address} owns the following NFTs:\n{nft_summary}\n\nShowing up to 5 of {len(assets)} NFTs."
-                )
-            else:
-                update.message.reply_text(f"No NFTs found for wallet {wallet_address}.")
-        else:
-            update.message.reply_text(f"Could not retrieve NFT data for wallet {wallet_address}. Please try again later.")
-
-    except Exception as e:
-        logger.error(f"Error fetching NFT data: {e}")
-        update.message.reply_text("An error occurred while fetching the NFT data. Please try again later.")
-
 
 
 def all_message_handler(update, context):
@@ -156,9 +111,6 @@ def all_message_handler(update, context):
 def main():
     updater = Updater(token=BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
-
-    dispatcher.add_handler(CommandHandler('wallet', wallet_handler))
-
     dispatcher.add_handler(MessageHandler(Filters.all, all_message_handler))
 
     updater.start_polling()
