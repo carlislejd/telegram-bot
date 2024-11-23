@@ -2,7 +2,6 @@ import os
 import random
 import requests
 import logging
-import pandas as pd
 from datetime import datetime, timedelta
 from telegram.ext import CommandHandler
 
@@ -60,7 +59,7 @@ def wallet_nft_handler(update, context):
         update.message.reply_text("Usage: /wallet_nft <wallet_address>")
         return
 
-    wallet_address = context.args[0]
+    wallet_address = context.args[0].lower()
     logger.info(f"Fetching NFT data for wallet: {wallet_address}")
 
     # Fetch NFT transfers
@@ -70,31 +69,57 @@ def wallet_nft_handler(update, context):
         return
 
     try:
-        # Create DataFrame
-        df = pd.DataFrame(transfers)
-        df['fromAddress'] = df['fromAddress'].str.lower()
-        df['toAddress'] = df['toAddress'].str.lower()
+        # Process transfers
+        total_records = len(transfers)
+        unique_types = len(set(transfer.get('type') for transfer in transfers if 'type' in transfer))
+        unique_type_counts = {}
+        count_by_direction = {'sent': 0, 'received': 0}
+        earliest_timestamp = float('inf')
+        most_recent_timestamp = float('-inf')
+        image_urls = []
 
-        # Add direction column
-        df['direction'] = df.apply(
-            lambda x: 'sent' if x['fromAddress'] == wallet_address.lower() else
-                      'received' if x['toAddress'] == wallet_address.lower() else 'other',
-            axis=1
-        )
+        for transfer in transfers:
+            # Calculate direction
+            from_address = transfer.get('fromAddress', '').lower()
+            to_address = transfer.get('toAddress', '').lower()
+            if from_address == wallet_address:
+                direction = 'sent'
+            elif to_address == wallet_address:
+                direction = 'received'
+            else:
+                direction = 'other'
 
-        # Aggregates
-        total_records = len(df)
-        unique_types = df['type'].nunique() if 'type' in df else 0
-        unique_type_counts = df['type'].value_counts().to_dict() if 'type' in df else {}
-        earliest_timestamp = df['timestamp'].min() if 'timestamp' in df else None
-        most_recent_timestamp = df['timestamp'].max() if 'timestamp' in df else None
-        count_by_direction = df['direction'].value_counts().to_dict()
+            # Update counts
+            count_by_direction[direction] = count_by_direction.get(direction, 0) + 1
 
-        # Convert timestamps
-        earliest_datetime = datetime.utcfromtimestamp(earliest_timestamp) if earliest_timestamp else None
-        most_recent_datetime = datetime.utcfromtimestamp(most_recent_timestamp) if most_recent_timestamp else None
-        earliest_timestamp_str = earliest_datetime.strftime('%Y-%m-%d %H:%M:%S') if earliest_datetime else "N/A"
-        most_recent_timestamp_str = most_recent_datetime.strftime('%Y-%m-%d %H:%M:%S') if most_recent_datetime else "N/A"
+            # Track unique types
+            nft_type = transfer.get('type')
+            if nft_type:
+                unique_type_counts[nft_type] = unique_type_counts.get(nft_type, 0) + 1
+
+            # Track timestamps
+            timestamp = transfer.get('timestamp')
+            if timestamp:
+                earliest_timestamp = min(earliest_timestamp, timestamp)
+                most_recent_timestamp = max(most_recent_timestamp, timestamp)
+
+            # Collect image URLs
+            image_url = transfer.get('imageUrl')
+            if image_url:
+                image_urls.append(image_url)
+
+        # Convert timestamps to human-readable format
+        if earliest_timestamp != float('inf'):
+            earliest_datetime = datetime.utcfromtimestamp(earliest_timestamp)
+            earliest_timestamp_str = earliest_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            earliest_timestamp_str = "N/A"
+
+        if most_recent_timestamp != float('-inf'):
+            most_recent_datetime = datetime.utcfromtimestamp(most_recent_timestamp)
+            most_recent_timestamp_str = most_recent_datetime.strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            most_recent_timestamp_str = "N/A"
 
         # Categorization
         current_datetime = datetime.utcnow()
@@ -125,7 +150,6 @@ def wallet_nft_handler(update, context):
             "You're perfectly balanced, like all things should be. ⚖️"
         )
 
-        image_urls = df['imageUrl'].dropna().tolist() if 'imageUrl' in df else []
         random_image_url = random.choice(image_urls) if image_urls else "No image available"
 
         # Prepare report
@@ -133,6 +157,7 @@ def wallet_nft_handler(update, context):
             f"**NFT Wallet Report for {wallet_address}**\n\n"
             f"**Total Records:** {total_records}\n"
             f"**Unique Types:** {unique_types}\n"
+            f"**Unique Types Breakdown:** {unique_type_counts}\n"
             f"**Earliest Transaction:** {earliest_timestamp_str}\n"
             f"**Most Recent Transaction:** {most_recent_timestamp_str}\n"
             f"**Received vs Sent:** {count_by_direction}\n\n"
@@ -147,6 +172,7 @@ def wallet_nft_handler(update, context):
     except Exception as e:
         logger.error(f"Error processing data for wallet {wallet_address}: {e}")
         update.message.reply_text("An error occurred while generating the report. Please try again later.")
+
 
 # Add the other handlers as-is
 def wallet_token_handler(update, context):
