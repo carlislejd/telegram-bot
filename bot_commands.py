@@ -38,11 +38,19 @@ def fetch_all_nft_transfers(wallet_address):
             response.raise_for_status()
             data = response.json()
 
+            # Debug: Log the raw response
+            logger.debug(f"API Response: {data}")
+
             if 'result' not in data or 'transfers' not in data['result']:
+                logger.info(f"No transfers found for wallet {wallet_address}.")
                 break
 
             transfers.extend(data['result']['transfers'])
 
+            # Debug: Log the number of transfers fetched so far
+            logger.info(f"Fetched {len(data['result']['transfers'])} transfers. Total so far: {len(transfers)}")
+
+            # Handle pagination
             if 'nextPageToken' in data['result']:
                 page_token = data['result']['nextPageToken']
             else:
@@ -51,7 +59,9 @@ def fetch_all_nft_transfers(wallet_address):
             logger.error(f"Error fetching data for wallet {wallet_address}: {e}")
             return []
 
+    logger.info(f"Total transfers fetched: {len(transfers)}")
     return transfers
+
 
 # Handler for /wallet_nft
 def wallet_nft_handler(update, context):
@@ -68,8 +78,11 @@ def wallet_nft_handler(update, context):
         update.message.reply_text(f"No NFT transfer data found for wallet {wallet_address}.")
         return
 
+    # Debug: Log the number of transfers
+    logger.info(f"Processing {len(transfers)} transfers for wallet {wallet_address}.")
+
     try:
-        # Process transfers
+        # Process and summarize data
         total_records = len(transfers)
         unique_types = len(set(transfer.get('type') for transfer in transfers if 'type' in transfer))
         unique_type_counts = {}

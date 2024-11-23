@@ -6,7 +6,7 @@ from bot_commands import add_command_handlers
 from config import messages_collection
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Bot token
