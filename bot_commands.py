@@ -10,21 +10,22 @@ logger = logging.getLogger(__name__)
 
 # API Configuration
 API_KEY = os.getenv('ANKR')
-ANKR_MULTICHAIN = f'https://rpc.ankr.com/multichain/{API_KEY}'
-HEADERS = {'Content-Type': 'application/json'}
+ANKR_MULTICHAIN = f'https://rpc.ankr.com/multichain/{API_KEY}/?ankr_getNftTransfers'
+HEADERS = {"accept": "application/json",
+        "content-type": "application/json"}
 
 # Function to fetch all NFT transfers
 def fetch_all_nft_transfers(wallet_address):
     transfers = []
     page_token = None
-    url = ANKR_MULTICHAIN.replace('/multichain', '/multichain/?ankr_getNftTransfers')
+    url = ANKR_MULTICHAIN
 
     while True:
         payload = {
             "jsonrpc": "2.0",
             "method": "ankr_getNftTransfers",
             "params": {
-                "address": [wallet_address.lower()],
+                "address": [wallet_address],
                 "pageSize": 10000
             },
             "id": 1
