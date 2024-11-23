@@ -1,19 +1,30 @@
 import os
 import logging
+import signal
 from telegram.ext import Updater, MessageHandler, Filters
 from bot_commands import add_command_handlers
 from config import messages_collection
 
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Bot token
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_ID")
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN is not set. Please configure the TELEGRAM_BOT_ID environment variable.")
+    exit(1)
 
 def save_to_db(data):
-    collection = messages_collection()
-    collection.insert_one(data)
+    """Save data to the database."""
+    try:
+        collection = messages_collection()
+        collection.insert_one(data)
+    except Exception as e:
+        logger.error(f"Error saving to DB: {e}", exc_info=True)
 
 def process_message(update):
+    """Extract relevant data from the message."""
     message = update.message
     user = message.from_user
     chat = message.chat
@@ -30,7 +41,7 @@ def process_message(update):
             "language_code": user.language_code,
         },
         "chat": {"id": chat.id, "type": chat.type, "title": chat.title},
-        "text": message.text,
+        "text": message.text if message.text else "",
     }
     return data
 
@@ -41,10 +52,17 @@ def all_message_handler(update, context):
         logger.info(f"Received message from {data['user']['id']}")
         save_to_db(data)
     except Exception as e:
-        logger.error(f"Error in message handler: {e}")
+        logger.error(f"Error in message handler: {e}", exc_info=True)
+
+def stop_bot(signum, frame):
+    """Gracefully stop the bot."""
+    logger.info("Bot shutting down...")
+    updater.stop()
+    exit(0)
 
 def main():
     """Main entry point for the bot."""
+    global updater
     updater = Updater(token=BOT_TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
@@ -53,6 +71,10 @@ def main():
 
     # Add a message handler for all text messages
     dispatcher.add_handler(MessageHandler(Filters.all, all_message_handler))
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, stop_bot)
+    signal.signal(signal.SIGTERM, stop_bot)
 
     # Start the bot
     updater.start_polling()

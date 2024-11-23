@@ -14,7 +14,7 @@ ANKR_MULTICHAIN = f'https://rpc.ankr.com/multichain/{API_KEY}'
 HEADERS = {'Content-Type': 'application/json'}
 
 # Function to fetch all NFT transfers
-def fetch_all_nft_transfers(owner_address):
+def fetch_all_nft_transfers(wallet_address):
     transfers = []
     page_token = None
     url = ANKR_MULTICHAIN.replace('/multichain', '/multichain/?ankr_getNftTransfers')
@@ -24,7 +24,7 @@ def fetch_all_nft_transfers(owner_address):
             "jsonrpc": "2.0",
             "method": "ankr_getNftTransfers",
             "params": {
-                "address": [owner_address],
+                "address": [wallet_address.lower()],
                 "pageSize": 10000
             },
             "id": 1
@@ -48,7 +48,7 @@ def fetch_all_nft_transfers(owner_address):
             else:
                 break
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching data for address {owner_address}: {e}")
+            logger.error(f"Error fetching data for wallet {wallet_address}: {e}")
             return []
 
     return transfers
@@ -173,7 +173,6 @@ def wallet_nft_handler(update, context):
         logger.error(f"Error processing data for wallet {wallet_address}: {e}")
         update.message.reply_text("An error occurred while generating the report. Please try again later.")
 
-
 # Add the other handlers as-is
 def wallet_token_handler(update, context):
     if len(context.args) != 1:
@@ -196,4 +195,3 @@ def add_command_handlers(dispatcher):
     dispatcher.add_handler(CommandHandler('wallet_nft', wallet_nft_handler))
     dispatcher.add_handler(CommandHandler('wallet_token', wallet_token_handler))
     dispatcher.add_handler(CommandHandler('commands', commands_handler))
-
